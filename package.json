@@ -1,0 +1,16 @@
+{
+  "name": "change-hue",
+  "version": "1.0.0",
+  "description": "Script Node.js para recolorir uma imagem PNG alterando sua **matiz (hue)** para um valor fixo.",
+  "main": "change-hue.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "sharp": "^0.34.5"
+  }
+}
