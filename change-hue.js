@@ -7,7 +7,7 @@ const outputDir = "./output";
 const outputPath = path.join(outputDir, "imagem_recolorida.png");
 
 // Matiz desejada: 0 a 360
-const TARGET_HUE = 220;
+const TARGET_HUE = 0;
 
 if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
