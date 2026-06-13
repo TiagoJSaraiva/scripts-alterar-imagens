@@ -1,15 +1,23 @@
 const sharp = require("sharp");
 
 const INPUT = "./input/image.png";
-const OUTPUT = "./output/image.png";
+const OUTPUT = "./output/output.png";
 
-// ajuste fino
-const RED_RANGE = 28;        // quanto maior, mais tons próximos do vermelho pega
-const TARGET_HUE = 28;       // matiz puxada para marrom/cinza quente
-const STRENGTH = 0.75;       // 0 a 1: força da alteração
+// pega vermelhos, laranjas e amarelos quentes
+const WARM_HUE_MIN = 0;
+const WARM_HUE_MAX = 65;
+
+// quanto dessaturar os tons quentes
+const DESATURATION = 0.65;
+
+// opcional: puxa um pouco a matiz para marrom/frio neutro
+const TARGET_HUE = 35;
+const HUE_SHIFT_STRENGTH = 1;
 
 function rgbToHsv(r, g, b) {
-  r /= 255; g /= 255; b /= 255;
+  r /= 255;
+  g /= 255;
+  b /= 255;
 
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
@@ -36,7 +44,7 @@ function hsvToRgb(h, s, v) {
   const x = c * (1 - Math.abs((h / 60) % 2 - 1));
   const m = v - c;
 
-  let r = 0, g = 0, b = 0;
+  let r, g, b;
 
   if (h < 60) [r, g, b] = [c, x, 0];
   else if (h < 120) [r, g, b] = [x, c, 0];
@@ -52,14 +60,17 @@ function hsvToRgb(h, s, v) {
   };
 }
 
-function hueDistance(a, b) {
-  const diff = Math.abs(a - b);
-  return Math.min(diff, 360 - diff);
+function lerp(a, b, t) {
+  return a + (b - a) * t;
 }
 
 function lerpAngle(a, b, t) {
   let diff = ((b - a + 540) % 360) - 180;
   return (a + diff * t + 360) % 360;
+}
+
+function isWarmHue(h) {
+  return h >= WARM_HUE_MIN && h <= WARM_HUE_MAX;
 }
 
 async function main() {
@@ -76,20 +87,20 @@ async function main() {
 
     const hsv = rgbToHsv(r, g, b);
 
-    const isNearRed =
-      hueDistance(hsv.h, 0) <= RED_RANGE ||
-      hueDistance(hsv.h, 360) <= RED_RANGE;
+    if (!isWarmHue(hsv.h)) continue;
 
-    if (!isNearRed) continue;
+    // ignora pixels quase pretos/cinza para não sujar contornos
+    if (hsv.v < 0.08 || hsv.s < 0.08) continue;
 
-    const distance = hueDistance(hsv.h, 0);
-    const falloff = 1 - Math.min(distance / RED_RANGE, 1);
-    const amount = STRENGTH * falloff;
+    const newH = lerpAngle(hsv.h, TARGET_HUE, HUE_SHIFT_STRENGTH);
 
-    const newHue = lerpAngle(hsv.h, TARGET_HUE, amount);
+    // aqui está a "desvermelhização" real
+    const newS = lerp(hsv.s, 0, DESATURATION);
 
-    // mantém S e V iguais
-    const rgb = hsvToRgb(newHue, hsv.s, hsv.v);
+    // V é preservado
+    const newV = hsv.v;
+
+    const rgb = hsvToRgb(newH, newS, newV);
 
     data[i] = rgb.r;
     data[i + 1] = rgb.g;
@@ -102,7 +113,9 @@ async function main() {
       height: info.height,
       channels: 4,
     },
-  }).png().toFile(OUTPUT);
+  })
+    .png()
+    .toFile(OUTPUT);
 
   console.log(`Imagem salva em ${OUTPUT}`);
 }

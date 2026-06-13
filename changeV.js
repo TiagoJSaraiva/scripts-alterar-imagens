@@ -55,6 +55,7 @@ async function alterarBrilhoHSV() {
   try {
     // 1. Carrega os pixels brutos da imagem
     const { data, info } = await sharp(INPUT_PATH)
+      .removeAlpha() // Remove canal alpha se existir
       .raw()
       .toBuffer({ resolveWithObject: true });
 
