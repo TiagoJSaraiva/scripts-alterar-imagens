@@ -8,11 +8,11 @@ const OUTPUT_PATH = "./output/image.png";
 
 // Quanto menor, mais seletivo.
 // Para essa imagem, algo entre 12 e 25 deve funcionar bem.
-const BLACK_THRESHOLD = 110;
+const BLACK_THRESHOLD = 40;
 
 // Garante que só pixels realmente escuros sejam alterados.
 // Se algum detalhe do título for afetado, diminua isso também.
-const MAX_CHANNEL_THRESHOLD = 60;
+const MAX_CHANNEL_THRESHOLD = 20;
 
 // 0 = vira preto absoluto
 // 0.25 = escurece bastante

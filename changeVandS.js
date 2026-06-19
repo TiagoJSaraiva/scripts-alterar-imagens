@@ -1,26 +1,24 @@
 const sharp = require('sharp');
+const fs = require('fs/promises');
+const path = require('path');
 
 // ==================== CONFIGURAÇÃO ====================
 const INPUT_PATH = './input/image.png';
+const INPUT_FOLDER = './input';
+const OUTPUT_FOLDER = './output';
+
 const OUTPUT_PATH = './output/resultado_alterado.png';
 
-// Defina aqui quanto quer mudar no Brilho (V).
-// Valores positivos aumentam o brilho, valores negativos escurecem.
-// Exemplo: 30, -50, 15, etc.
 const DELTA_V = 50;
-
-// Defina aqui quanto quer mudar na Saturação (S).
-// Valores positivos aumentam a saturação, valores negativos reduzem.
-// Use 0 para não alterar a saturação.
-// Exemplo: 30, -50, 15, etc.
 const DELTA_S = 30;
 // ======================================================
+
+const processarTodas = process.argv.includes('all-images');
 
 function limitarValor(valor, min, max) {
   return Math.min(Math.max(valor, min), max);
 }
 
-// Funções auxiliares de conversão matemática
 function rgbParaHsv(r, g, b) {
   r /= 255;
   g /= 255;
@@ -37,17 +35,15 @@ function rgbParaHsv(r, g, b) {
   s = max === 0 ? 0 : d / max;
 
   if (max === min) {
-    h = 0; // acromático
+    h = 0;
   } else {
     switch (max) {
       case r:
         h = (g - b) / d + (g < b ? 6 : 0);
         break;
-
       case g:
         h = (b - r) / d + 2;
         break;
-
       case b:
         h = (r - g) / d + 4;
         break;
@@ -56,7 +52,7 @@ function rgbParaHsv(r, g, b) {
     h /= 6;
   }
 
-  return [h, s, v]; // H, S e V entre 0 e 1
+  return [h, s, v];
 }
 
 function hsvParaRgb(h, s, v) {
@@ -73,39 +69,22 @@ function hsvParaRgb(h, s, v) {
 
   switch (i % 6) {
     case 0:
-      r = v;
-      g = t;
-      b = p;
+      r = v; g = t; b = p;
       break;
-
     case 1:
-      r = q;
-      g = v;
-      b = p;
+      r = q; g = v; b = p;
       break;
-
     case 2:
-      r = p;
-      g = v;
-      b = t;
+      r = p; g = v; b = t;
       break;
-
     case 3:
-      r = p;
-      g = q;
-      b = v;
+      r = p; g = q; b = v;
       break;
-
     case 4:
-      r = t;
-      g = p;
-      b = v;
+      r = t; g = p; b = v;
       break;
-
     case 5:
-      r = v;
-      g = p;
-      b = q;
+      r = v; g = p; b = q;
       break;
   }
 
@@ -116,70 +95,108 @@ function hsvParaRgb(h, s, v) {
   ];
 }
 
-async function alterarImagemHSV() {
-  try {
-    // 1. Carrega os pixels brutos da imagem
-    const { data, info } = await sharp(INPUT_PATH)
-      .removeAlpha() // Remove canal alpha se existir
-      .raw()
-      .toBuffer({ resolveWithObject: true });
+async function alterarImagemHSV(inputPath, outputPath) {
+  const { data, info } = await sharp(inputPath)
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
 
-    const width = info.width;
-    const height = info.height;
+  const width = info.width;
+  const height = info.height;
 
-    const outputBuffer = Buffer.alloc(width * height * 3); // RGB
+  const outputBuffer = Buffer.alloc(width * height * 3);
 
-    // Normaliza os deltas para a escala de 0 a 1
-    const deltaVNormalizado = DELTA_V / 255;
-    const deltaSNormalizado = DELTA_S / 255;
+  const deltaVNormalizado = DELTA_V / 255;
+  const deltaSNormalizado = DELTA_S / 255;
 
-    for (let i = 0; i < data.length; i += 3) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
+  for (let i = 0; i < data.length; i += 3) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
 
-      // 2. Converte para HSV
-      let [h, s, v] = rgbParaHsv(r, g, b);
+    let [h, s, v] = rgbParaHsv(r, g, b);
 
-      // 3. Aplica alteração no brilho, se indicado
-      if (DELTA_V !== 0) {
-        v += deltaVNormalizado;
-        v = limitarValor(v, 0, 1);
-      }
-
-      // 4. Aplica alteração na saturação, se indicado
-      if (DELTA_S !== 0) {
-        s += deltaSNormalizado;
-        s = limitarValor(s, 0, 1);
-      }
-
-      // 5. Converte de volta para RGB
-      const [novoR, novoG, novoB] = hsvParaRgb(h, s, v);
-
-      // 6. Salva no buffer de saída
-      outputBuffer[i] = novoR;
-      outputBuffer[i + 1] = novoG;
-      outputBuffer[i + 2] = novoB;
+    if (DELTA_V !== 0) {
+      v = limitarValor(v + deltaVNormalizado, 0, 1);
     }
 
-    // 7. Salva a nova imagem
-    await sharp(outputBuffer, {
-      raw: {
-        width,
-        height,
-        channels: 3,
-      },
-    })
-      .png()
-      .toFile(OUTPUT_PATH);
+    if (DELTA_S !== 0) {
+      s = limitarValor(s + deltaSNormalizado, 0, 1);
+    }
 
-    console.log(`Sucesso!`);
+    const [novoR, novoG, novoB] = hsvParaRgb(h, s, v);
+
+    outputBuffer[i] = novoR;
+    outputBuffer[i + 1] = novoG;
+    outputBuffer[i + 2] = novoB;
+  }
+
+  await sharp(outputBuffer, {
+    raw: {
+      width,
+      height,
+      channels: 3,
+    },
+  })
+    .png()
+    .toFile(outputPath);
+}
+
+async function processarImagemUnica() {
+  await fs.mkdir(OUTPUT_FOLDER, { recursive: true });
+
+  await alterarImagemHSV(INPUT_PATH, OUTPUT_PATH);
+
+  console.log('Sucesso!');
+  console.log(`Imagem salva em: ${OUTPUT_PATH}`);
+}
+
+async function processarTodasImagens() {
+  await fs.mkdir(OUTPUT_FOLDER, { recursive: true });
+
+  const arquivos = await fs.readdir(INPUT_FOLDER);
+
+  const extensoesPermitidas = ['.png', '.jpg', '.jpeg', '.webp'];
+
+  const imagens = arquivos.filter((arquivo) =>
+    extensoesPermitidas.includes(path.extname(arquivo).toLowerCase())
+  );
+
+  if (imagens.length === 0) {
+    console.log('Nenhuma imagem encontrada na pasta input.');
+    return;
+  }
+
+  for (const imagem of imagens) {
+    const inputPath = path.join(INPUT_FOLDER, imagem);
+
+    const nomeSemExtensao = path.parse(imagem).name;
+    const outputPath = path.join(
+      OUTPUT_FOLDER,
+      `${nomeSemExtensao}_alterado.png`
+    );
+
+    await alterarImagemHSV(inputPath, outputPath);
+
+    console.log(`Processado: ${imagem} -> ${outputPath}`);
+  }
+
+  console.log('Todas as imagens foram processadas!');
+}
+
+async function main() {
+  try {
+    if (processarTodas) {
+      await processarTodasImagens();
+    } else {
+      await processarImagemUnica();
+    }
+
     console.log(`Brilho alterado em: ${DELTA_V}`);
     console.log(`Saturação alterada em: ${DELTA_S}`);
-    console.log(`Imagem salva em: ${OUTPUT_PATH}`);
   } catch (error) {
-    console.error('Erro ao processar a imagem:', error);
+    console.error('Erro ao processar imagem:', error);
   }
 }
 
-alterarImagemHSV();
+main();
