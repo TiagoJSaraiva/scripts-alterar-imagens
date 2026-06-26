@@ -2,12 +2,12 @@ const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
 
-const inputPath = "./input/imagem.png";
+const inputPath = "./input/image.png";
 const outputDir = "./output";
 const outputPath = path.join(outputDir, "imagem_recolorida.png");
 
 // Matiz desejada: 0 a 360
-const TARGET_HUE = 0;
+const TARGET_HUE = 185;
 
 if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
